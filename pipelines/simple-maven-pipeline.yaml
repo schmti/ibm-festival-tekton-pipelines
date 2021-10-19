@@ -1,9 +1,13 @@
-#This simple tekton pipeline was built exclusively from standard ClusterTask.
 apiVersion: tekton.dev/v1beta1
 kind: Pipeline
 metadata:
   name: simple-maven-pipeline
 spec:
+  params:
+    - default: latest
+      description: used as ImageTag
+      name: image_tag
+      type: string
   tasks:
     - name: git-clone
       params:
@@ -31,7 +35,9 @@ spec:
         name: git-clone
       workspaces:
         - name: output
-          workspace: main
+          workspace: source-code
+        - name: basic-auth
+          workspace: source-code
     - name: maven-build
       params:
         - name: MAVEN_IMAGE
@@ -49,13 +55,13 @@ spec:
         name: maven
       workspaces:
         - name: source
-          workspace: main
+          workspace: source-code
         - name: maven-settings
-          workspace: main
+          workspace: source-code
     - name: build-snapshot-image
       params:
         - name: IMAGE
-          value: '<REGISTRY>/<REPO>/<IMAGE>:<TAG>'
+          value: 'quay.io/<YOURREPO>/ibm-festival-java-app-snapshot:$(params.image_tag)'
         - name: BUILDER_IMAGE
           value: >-
             registry.redhat.io/rhel8/buildah@sha256:99cae35f40c7ec050fed3765b2b27e0b8bbea2aa2da7c16408e2ca13c60ff8ee
@@ -71,7 +77,7 @@ spec:
           value: oci
         - name: PUSH_EXTRA_ARGS
           value: >-
-            --creds=<USERNAME>:<PASSWORD>
+            --creds=<QUAY-USER>:<QUAY-PASSWORD>
       runAfter:
         - maven-build
       taskRef:
@@ -79,7 +85,7 @@ spec:
         name: buildah
       workspaces:
         - name: source
-          workspace: main
+          workspace: source-code
     - name: maven-integration-test
       params:
         - name: MAVEN_IMAGE
@@ -97,13 +103,13 @@ spec:
         name: maven
       workspaces:
         - name: source
-          workspace: main
+          workspace: source-code
         - name: maven-settings
-          workspace: main
+          workspace: source-code
     - name: build-realease
       params:
         - name: IMAGE
-          value: '<REGISTRY>/<REPO>/<IMAGE>:<TAG>'
+          value: 'quay.io/<YOURREPO>/ibm-festival-java-app-release:$(params.image_tag)'
         - name: BUILDER_IMAGE
           value: >-
             registry.redhat.io/rhel8/buildah@sha256:99cae35f40c7ec050fed3765b2b27e0b8bbea2aa2da7c16408e2ca13c60ff8ee
@@ -119,7 +125,7 @@ spec:
           value: oci
         - name: PUSH_EXTRA_ARGS
           value: >-
-            --creds=<USERNAME>:<PASSWORD>
+            --creds=<QUAY-USER>:<QUAY-PASSWORD>
       runAfter:
         - maven-integration-test
       taskRef:
@@ -127,6 +133,6 @@ spec:
         name: buildah
       workspaces:
         - name: source
-          workspace: main
+          workspace: source-code
   workspaces:
-    - name: main
+    - name: source-code
