@@ -5,8 +5,14 @@ metadata:
 spec:
   workspaces:
     - name: source
-    #- name: git-basic-auth
+    - name: git-credentials
+      mountPath: /usr/share/git-creds
+      description: Must be a Secret with two key/value pairs username and git-token
   params:
+    - name: GITOPS_HOSTNAME
+      type: string
+    - name: GITOPS_REPOPATH
+      type: string
     - name: BUILDER_IMAGE
       type: string
     - name: BRANCH
@@ -18,9 +24,10 @@ spec:
   steps:
     - name: patch-deployment
       image: $(params.BUILDER_IMAGE)
-      command:
-        - /bin/bash
-      args: ['-c', "imageurl=$(params.IMAGEURL) yq e '.0.value = env(imageurl)' -i $(params.STAGE)/patches/patch-deployment-generated.yaml && echo OPERATION SUCCESSFUL"]      
+      script: |
+        #!/usr/bin/env bash
+        imageurl=$(params.IMAGEURL) yq e '.0.value = env(imageurl)' -i $(params.STAGE)/patches/patch-deployment-generated.yaml;
+        cat $(params.STAGE)/patches/patch-deployment-generated.yaml;
       workingDir: $(workspaces.source.path)
     - name: test-patch
       image: $(params.BUILDER_IMAGE)
@@ -28,33 +35,30 @@ spec:
         - /bin/bash
       args: ['-c', 'kustomize build $(params.STAGE) >> tmp.yaml && rm tmp.yaml && echo OPERATION SUCCESSFUL']
       workingDir: $(workspaces.source.path)
-    - name: git-config-mail
+    - name: git-config
       image: $(params.BUILDER_IMAGE)
-      command:
-        - /bin/bash
-      args: ['-c', 'git config --global user.email "pipeline@vop.viada.de" && echo OPERATION SUCCESSFUL']
-      workingDir: $(workspaces.source.path)
-    - name: git-config-user
-      image: $(params.BUILDER_IMAGE)
-      command:
-        - /bin/bash
-      args: ['-c', 'git config --global user.name "tekton" && echo OPERATION SUCCESSFUL']
+      script: |
+        #!/usr/bin/env bash
+        git config --global user.name "tekton" && echo OPERATION SUCCESSFUL;
+        git config --global user.email "pipeline@vop.viada.de" && echo OPERATION SUCCESSFUL;
       workingDir: $(workspaces.source.path)
     - name: add-changes
       image: $(params.BUILDER_IMAGE)
       command:
         - /bin/bash
-      args: ['-c', 'git add . && echo OPERATION SUCCESSFUL']
+      args: ['-c', 'git add $(params.STAGE)/patches/patch-deployment-generated.yaml && echo OPERATION SUCCESSFUL']
       workingDir: $(workspaces.source.path)
     - name: commit-changes
       image: $(params.BUILDER_IMAGE)
       command:
         - /bin/bash
-      args: ['-c', "git commit -m 'update imageurl in deployemnt' && echo OPERATION SUCCESSFUL"]
+      args: ['-c', "git commit -m 'update imageurl in deployemnt'"]
       workingDir: $(workspaces.source.path)
-    #- name: push-changes
-    #  image: $(params.BUILDER_IMAGE)
-    #  command:
-    #    - /bin/bash
-    #  args: ['-c', "git push origin HEAD:$(params.BRANCH) && echo OPERATION SUCCESSFUL"]
-    #  workingDir: $(workspaces.source.path)
+    - name: push-changes
+      image: $(params.BUILDER_IMAGE)
+      script: |
+        #!/usr/bin/env bash
+        USERNAME=$(cat /usr/share/git-creds/username);
+        GIT_TOKEN=$(cat /usr/share/git-creds/git-token);
+        git push -u https://${USERNAME}:${GIT_TOKEN}@$(params.GITOPS_HOSTNAME)$(params.GITOPS_REPOPATH) HEAD:"$(params.BRANCH)"
+      workingDir: $(workspaces.source.path)

@@ -4,8 +4,12 @@ metadata:
   name: simple-maven-pipeline-with-push
 spec:
   finally:
-    - name: patch-prod
+    - name: patch-deployment
       params:
+        - name: GITOPS_HOSTNAME
+          value: github.com
+        - name: GITOPS_REPOPATH
+          value: /schmti/ibm-festival-app-deployment.git
         - name: BUILDER_IMAGE
           value: 'quay.io/schmti/ibm-festival-custom-builder-image:latest'
         - name: BRANCH
@@ -13,13 +17,15 @@ spec:
         - name: STAGE
           value: 40_prod
         - name: IMAGEURL
-          value: 'quay.io/<YOURREPO>/ibm-festival-java-app-release:$(params.image_tag)'
+          value: 'quay.io/schmti/ibm-festival-java-app-release:$(params.image_tag)'
       taskRef:
         kind: Task
         name: patch-deployment
       workspaces:
         - name: source
           workspace: gitops-ressources
+        - name: git-credentials
+          workspace: git-credentials
   params:
     - default: latest
       description: used as ImageTag
@@ -76,7 +82,7 @@ spec:
     - name: build-snapshot-image
       params:
         - name: IMAGE
-          value: 'quay.io/<YOURREPO>/ibm-festival-java-app-snapshot:$(params.image_tag)'
+          value: 'quay.io/schmti/ibm-festival-java-app-snapshot:$(params.image_tag)'
         - name: BUILDER_IMAGE
           value: >-
             registry.redhat.io/rhel8/buildah@sha256:99cae35f40c7ec050fed3765b2b27e0b8bbea2aa2da7c16408e2ca13c60ff8ee
@@ -92,7 +98,7 @@ spec:
           value: oci
         - name: PUSH_EXTRA_ARGS
           value: >-
-            --creds=<QUAY-USER>:<QUAY-PASSWORD>
+            --creds=<QUAYUSER>:<QUAY_TOKEN>
       runAfter:
         - maven-build
       taskRef:
@@ -124,7 +130,7 @@ spec:
     - name: build-realease
       params:
         - name: IMAGE
-          value: 'quay.io/<YOURREPO>/ibm-festival-java-app-release:$(params.image_tag)'
+          value: 'quay.io/schmti/ibm-festival-java-app-release:$(params.image_tag)'
         - name: BUILDER_IMAGE
           value: >-
             registry.redhat.io/rhel8/buildah@sha256:99cae35f40c7ec050fed3765b2b27e0b8bbea2aa2da7c16408e2ca13c60ff8ee
@@ -140,7 +146,7 @@ spec:
           value: oci
         - name: PUSH_EXTRA_ARGS
           value: >-
-            --creds=<QUAY-USER>:<QUAY-PASSWORD>
+            --creds=<QUAYUSER>:<QUAY_TOKEN>
       runAfter:
         - maven-integration-test
       taskRef:
@@ -179,6 +185,10 @@ spec:
           workspace: gitops-ressources
     - name: patch-test
       params:
+        - name: GITOPS_HOSTNAME
+          value: github.com
+        - name: GITOPS_REPOPATH
+          value: /schmti/ibm-festival-app-deployment.git
         - name: BUILDER_IMAGE
           value: 'quay.io/schmti/ibm-festival-custom-builder-image:latest'
         - name: BRANCH
@@ -186,7 +196,7 @@ spec:
         - name: STAGE
           value: 20_test
         - name: IMAGEURL
-          value: 'quay.io/<YOURREPO>/ibm-festival-java-app-snapshot:$(params.image_tag)'
+          value: 'quay.io/schmti/ibm-festival-java-app-release:$(params.image_tag)'
       runAfter:
         - clone-gitops-repo
       taskRef:
@@ -195,8 +205,14 @@ spec:
       workspaces:
         - name: source
           workspace: gitops-ressources
+        - name: git-credentials
+          workspace: git-credentials
     - name: patch-int
       params:
+        - name: GITOPS_HOSTNAME
+          value: github.com
+        - name: GITOPS_REPOPATH
+          value: /schmti/ibm-festival-app-deployment.git
         - name: BUILDER_IMAGE
           value: 'quay.io/schmti/ibm-festival-custom-builder-image:latest'
         - name: BRANCH
@@ -204,7 +220,7 @@ spec:
         - name: STAGE
           value: 30_int
         - name: IMAGEURL
-          value: 'quay.io/<YOURREPO>/ibm-festival-java-app-release:$(params.image_tag)'
+          value: 'quay.io/schmti/ibm-festival-java-app-release:$(params.image_tag)'
       runAfter:
         - build-realease
       taskRef:
@@ -213,6 +229,9 @@ spec:
       workspaces:
         - name: source
           workspace: gitops-ressources
+        - name: git-credentials
+          workspace: git-credentials
   workspaces:
     - name: source-code
     - name: gitops-ressources
+    - name: git-credentials
